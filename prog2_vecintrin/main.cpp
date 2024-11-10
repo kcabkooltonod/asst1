@@ -188,16 +188,20 @@ void absVector(float* values, float* output, int N) {
 //  Why is that the case?
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
 
-    // All ones
+    // All ones 这个掩码表示的是每一个操作应该在一个vector的哪些数据上做
+    // 比如说load操作肯定是所有的位都要做，因此设定了一个全是1的掩码
     maskAll = _cs149_init_ones();
 
     // All zeros
+    // 初始化一个全为0的掩码
     maskIsNegative = _cs149_init_ones(0);
 
     // Load vector of values from contiguous memory addresses
+    // 对所有的位置都load数据进来
     _cs149_vload_float(x, values+i, maskAll);               // x = values[i];
 
     // Set mask according to predicate
+    // 对于所有的位置都数据都判断是否为0，为0则更新maskIsNegative对应位置为1
     _cs149_vlt_float(maskIsNegative, x, zero, maskAll);     // if (x < 0) {
 
     // Execute instruction using mask ("if" clause)
@@ -249,6 +253,42 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+  int elemLeft = N % VECTOR_WIDTH;
+  __cs149_vec_float value;
+  __cs149_vec_int exponent;
+  __cs149_vec_float result;
+  __cs149_vec_int zero = _cs149_vset_int(0);
+  __cs149_vec_int one = _cs149_vset_int(1);
+  __cs149_vec_float max = _cs149_vset_float(9.999999f);
+
+  __cs149_mask maskAll, maskIsNotZero, maskIsMax;
+
+  maskAll = _cs149_init_ones();
+
+  for(int i = 0; i < N - elemLeft; i += VECTOR_WIDTH) {
+    result = _cs149_vset_float(1.f);
+
+    _cs149_vload_float(value, values+i, maskAll);
+    _cs149_vload_int(exponent, exponents+i, maskAll);
+
+    _cs149_vgt_int(maskIsNotZero, exponent, zero, maskAll);
+
+    while (_cs149_cntbits(maskIsNotZero)) {
+      _cs149_vmult_float(result, result, value, maskIsNotZero);
+      _cs149_vsub_int(exponent, exponent, one, maskIsNotZero);
+      _cs149_vgt_int(maskIsNotZero, exponent, zero, maskIsNotZero);
+    }
+
+    _cs149_vgt_float(maskIsMax, result, max, maskAll);
+    _cs149_vset_float(result, 9.999999f, maskIsMax);
+
+    _cs149_vstore_float(output+i, result, maskAll);
+
+  }
+
+  if (elemLeft) {
+    clampedExpSerial(values + (N - elemLeft), exponents + (N - elemLeft), output + (N - elemLeft), elemLeft);
+  }
   
 }
 
@@ -270,11 +310,26 @@ float arraySumVector(float* values, int N) {
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
-  
-  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+  __cs149_vec_float sum = _cs149_vset_float(0.f);
+  __cs149_vec_float temp;
+  __cs149_mask maskAll;
 
+  maskAll = _cs149_init_ones();
+
+  for (int i = 0; i < N; i += VECTOR_WIDTH) {
+    _cs149_vload_float(temp, values + i, maskAll);
+    _cs149_vadd_float(sum, sum, temp, maskAll);
   }
 
-  return 0.0;
+  for (int i = VECTOR_WIDTH; i > 1; i /= 2) {
+    _cs149_hadd_float(sum, sum);
+    _cs149_interleave_float(sum, sum);
+  }
+
+  float output[VECTOR_WIDTH];
+  _cs149_vstore_float(output, sum, maskAll);
+
+  return output[0];
+
 }
 

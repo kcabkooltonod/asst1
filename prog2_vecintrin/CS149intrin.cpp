@@ -40,6 +40,7 @@ __cs149_mask _cs149_mask_and(__cs149_mask &maska, __cs149_mask &maskb) {
   return resultMask;
 }
 
+// 计算活跃的位置的数量
 int _cs149_cntbits(__cs149_mask &maska) {
   int count = 0;
   for (int i=0; i<VECTOR_WIDTH; i++) {
