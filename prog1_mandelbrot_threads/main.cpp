@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <algorithm>
 #include <getopt.h>
+#include <fstream>
+#include <iostream>
 
 #include "CycleTimer.h"
 
@@ -71,7 +73,7 @@ int main(int argc, char** argv) {
     const unsigned int width = 1600;
     const unsigned int height = 1200;
     const int maxIterations = 256;
-    int numThreads = 2;
+    int numThreads = 20;
 
     float x0 = -2;
     float x1 = 1;
@@ -143,16 +145,36 @@ int main(int argc, char** argv) {
     // Run the threaded version
     //
 
-    double minThread = 1e30;
-    for (int i = 0; i < 5; ++i) {
-      memset(output_thread, 0, width * height * sizeof(int));
-        double startTime = CycleTimer::currentSeconds();
-        mandelbrotThread(numThreads, x0, y0, x1, y1, width, height, maxIterations, output_thread);
-        double endTime = CycleTimer::currentSeconds();
-        minThread = std::min(minThread, endTime - startTime);
+    std::ofstream dataFile("speedup_data.txt");
+
+    if(!dataFile) {
+        std::cerr<<"Error opening speeduo_data.txt to writing.\n";
+        return 1;
     }
 
-    printf("[mandelbrot thread]:\t\t[%.3f] ms\n", minThread * 1000);
+    dataFile << "Threads speedup:\n";
+
+    for (int numThreadsi = 0; numThreadsi < numThreads; numThreadsi++){
+        double minThread = 1e30;
+        for (int i = 0; i < 5; ++i) {
+        memset(output_thread, 0, width * height * sizeof(int));
+            double startTime = CycleTimer::currentSeconds();
+            mandelbrotThread(numThreadsi+1, x0, y0, x1, y1, width, height, maxIterations, output_thread);
+            double endTime = CycleTimer::currentSeconds();
+            minThread = std::min(minThread, endTime - startTime);
+        }
+
+        printf("[mandelbrot thread]:\t\t[%.3f] ms\n", minThread * 1000);
+
+        double speedup = minSerial / minThread;
+        dataFile <<numThreadsi + 1<<" "<<speedup<<"\n";
+
+        printf("\t\t\t\t(%.2fx speedup from %d threads)\n", minSerial/minThread, numThreads);
+
+    }
+
+    dataFile.close();
+
     writePPMImage(output_thread, width, height, "mandelbrot-thread.ppm", maxIterations);
 
     if (! verifyResult (output_serial, output_thread, width, height)) {
@@ -165,7 +187,7 @@ int main(int argc, char** argv) {
     }
 
     // compute speedup
-    printf("\t\t\t\t(%.2fx speedup from %d threads)\n", minSerial/minThread, numThreads);
+    // printf("\t\t\t\t(%.2fx speedup from %d threads)\n", minSerial/minThread, numThreads);
 
     delete[] output_serial;
     delete[] output_thread;
