@@ -61,12 +61,10 @@ void sqrtAVX2(int N,
         __m256 result = _mm256_mul_ps(x, guess);
         _mm256_storeu_ps(&output[i], result);
     }
-
     // Handle remaining elements
     for (; i < N; i++) {
         float x = values[i];
         float guess = initialGuess;
-
         float error = fabs(guess * guess * x - 1.f);
         while (error > kThreshold) {
             guess = (3.f * guess - x * guess * guess * guess) * 0.5f;
